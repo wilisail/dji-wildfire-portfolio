@@ -22,21 +22,22 @@ npm run dev
 ## Contentful setup
 
 1. Create a Contentful account and a space. Copy its Space ID, create a Content Delivery API key, and create a Content Management API personal access token with write access. The Delivery API reads published content; the Management API is used by the server to create and publish articles. Keep both tokens server-side and out of GitHub.
-2. Create a content type with **API identifier `blogPost`**. Add these fields using the exact field IDs:
+2. This project is configured for Contentful's **Blog starter** model, whose content type API identifier is `pageBlogPost`. The website reads and writes these starter fields:
 
 | Contentful field ID | Type |
 |---|---|
-| `id` | Short text |
+| `internalName` | Short text |
+| `slug` | Short text |
+| `publishedDate` | Date |
 | `title` | Short text |
-| `excerpt` | Short text |
-| `content` | Long text |
-| `category` | Short text |
-| `tags` | Array of short text |
-| `author` | Short text |
-| `publishedAt` | Date and time |
+| `shortDescription` | Long text |
+| `content` | Rich text |
+| `featuredImage` | Asset reference |
+
+The Blog starter also adds optional author and SEO references. The website uses the first published sample post's featured image for articles created through its editor, so keep at least one published sample post with an image.
 
 3. Note the space's default locale and environment ID (usually `master`). Set `CONTENTFUL_LOCALE` and `CONTENTFUL_ENVIRONMENT` to match.
-4. Create and publish the initial sample entries from `seed-posts.json` in Contentful. New articles submitted on the site are created through the Management API and published immediately.
+4. Replace the starter sample post with wildfire field insight content and publish it. New articles submitted on the site are created through the Management API and published immediately.
 5. Set `EDITOR_EMAIL`, `EDITOR_NAME`, and a long unique `EDITOR_PASSWORD` for the one website editor. These credentials are separate from your Contentful account; there is no public sign-up flow.
 6. Set `SESSION_SECRET` to a random value of at least 32 characters. It signs the website's HttpOnly editor-session cookie.
 7. Test editor login, article publication, article visibility while signed out, and logout before submission.
