@@ -4,7 +4,7 @@ Code Challenge 2 by Wili K. An independent educational adaptation of DJI’s wil
 
 ## Stack and routes
 
-React 19, Vite 7, TypeScript 5, Tailwind CSS 4, Backendless REST authentication/content, and Vercel Node functions. Native page navigation and prerendered HTML keep the public pages simple and fast.
+React 19, Vite 7, TypeScript 5, Tailwind CSS 4, Contentful content management/delivery APIs, and Vercel Node functions. Native page navigation and prerendered HTML keep the public pages simple and fast.
 
 Required pages: `/`, `/about`, `/solutions`, `/teams`, `/blog`, `/create-blog`, `/login`. Article detail pages use `/blog/:id`. Team profiles are fetched dynamically from Random User and clearly labelled as sample profiles.
 
@@ -17,39 +17,43 @@ cp .env.example .env.local
 npm run dev
 ```
 
-`npm run build` checks TypeScript, builds the application, and prerenders the public pages. `npm run test:flows` checks authentication, validation, origin protection, publishing, public retrieval, cookie tampering, and logout against a mocked Backendless contract. The contract checks do not replace live integration testing.
+`npm run build` checks TypeScript, builds the application, and prerenders the public pages. `npm run test:flows` checks editor authentication, validation, origin protection, Contentful publishing, public retrieval, cookie tampering, and logout against a mocked Contentful contract. The contract checks do not replace live integration testing.
 
-## Backendless setup
+## Contentful setup
 
-1. Create a Backendless account and an application. In the app settings/API setup, obtain its public HTTPS `*.backendless.app` application URL. Set `BACKENDLESS_BASE_URL` to this URL (the server normalizes it to `/api`). App ID plus REST API key are also supported through `BACKENDLESS_APP_ID` and `BACKENDLESS_REST_API_KEY`, but the application URL is simpler.
-2. In the Data section, create `BlogPosts`. Import `seed-posts.json` as the initial records, or create the columns below and import the records through the console. Keep the `Users` table separate.
-3. In `Users`, create one editor with email, name, and a password. These are application-editor credentials, separate from the Backendless console account. No website registration flow or admin moderation is required by the brief.
-4. On `BlogPosts`, allow public/anonymous **Find** and authenticated-user **Create/Add**. Deny anonymous writes and keep update/delete/permission management restricted. Grant authenticated users read access as well. On `Users`, retain protected user-data defaults; do not make passwords or user records public. Check role inheritance and explicit denies in the console.
-5. Set a random `SESSION_SECRET` of at least 32 characters in the local/server environment. It seals the HttpOnly session cookie; it must never be included in frontend code or GitHub.
-6. Verify a real login, article publication, article visibility from a separate signed-out browser, and logout before submission.
+1. Create a Contentful account and a space. Copy its Space ID, create a Content Delivery API key, and create a Content Management API personal access token with write access. The Delivery API reads published content; the Management API is used by the server to create and publish articles. Keep both tokens server-side and out of GitHub.
+2. Create a content type with **API identifier `blogPost`**. Add these fields using the exact field IDs:
 
-| BlogPosts column | Type |
+| Contentful field ID | Type |
 |---|---|
-| id | STRING, unique |
-| title | STRING |
-| excerpt | STRING |
-| content | TEXT |
-| category | STRING |
-| tags | TEXT containing a JSON array |
-| author | STRING |
-| publishedAt | STRING containing an ISO timestamp |
+| `id` | Short text |
+| `title` | Short text |
+| `excerpt` | Short text |
+| `content` | Long text |
+| `category` | Short text |
+| `tags` | Array of short text |
+| `author` | Short text |
+| `publishedAt` | Date and time |
 
-The `content` and `tags` columns should support long text. Backendless also adds its own `objectId`, `created`, `updated`, and ownership fields. The server sends the signed-in user token on create requests, so Backendless permissions remain the authority for writes.
+3. Note the space's default locale and environment ID (usually `master`). Set `CONTENTFUL_LOCALE` and `CONTENTFUL_ENVIRONMENT` to match.
+4. Create and publish the initial sample entries from `seed-posts.json` in Contentful. New articles submitted on the site are created through the Management API and published immediately.
+5. Set `EDITOR_EMAIL`, `EDITOR_NAME`, and a long unique `EDITOR_PASSWORD` for the one website editor. These credentials are separate from your Contentful account; there is no public sign-up flow.
+6. Set `SESSION_SECRET` to a random value of at least 32 characters. It signs the website's HttpOnly editor-session cookie.
+7. Test editor login, article publication, article visibility while signed out, and logout before submission.
+
+The public site reads entries using the Content Delivery API. The Management API token is only used by the server-side publishing route; it is never sent to browser code. Do not commit real tokens, editor credentials, or `.env.local`.
 
 ## Vercel deployment
 
 Use the Vite preset. The repository includes `vercel.json`, a Node API entrypoint, and a `dist/client` output directory. Configure these server/build environment variables:
 
-- `BACKENDLESS_BASE_URL`: public Backendless application URL.
-- `SESSION_SECRET`: server-only random signing key.
+- `CONTENTFUL_SPACE_ID`, `CONTENTFUL_ENVIRONMENT`, `CONTENTFUL_LOCALE`: the Contentful space and model location.
+- `CONTENTFUL_DELIVERY_TOKEN`: server-only read token for published content.
+- `CONTENTFUL_MANAGEMENT_TOKEN`: server-only write token for article publishing.
+- `EDITOR_EMAIL`, `EDITOR_NAME`, `EDITOR_PASSWORD`, `SESSION_SECRET`: server-only editor and session settings.
 - `SITE_ORIGIN`: the final verified production HTTPS origin, used for canonical links and the sitemap.
 
-Public pages can be viewed before configuration. The interface explicitly reports an unavailable content service and does not pretend that login or publication succeeded. Configure Backendless and test it before calling the project complete.
+Public pages can be viewed before configuration. The interface explicitly reports an unavailable content service and does not pretend that login or publication succeeded. Configure Contentful and test it before calling the project complete.
 
 ## Performance and accessibility
 
@@ -73,4 +77,4 @@ Run PageSpeed Insights on the actual public production URL, on mobile and deskto
 
 ## Submission status
 
-Implementation and local contract checks are complete. The production build passes; twelve mocked publishing/security checks pass. Browser checks verified mobile navigation, live Random User profiles, category filtering, and the unauthenticated Create Blog redirect to Login. Live Backendless verification, Vercel publication, GitHub publication, PageSpeed measurement, and final presentation remain dependent on account/app configuration. Update this section with verified links and results before submitting.
+The site uses Contentful for published article delivery and server-side article creation. Local contract tests mock Contentful and verify editor authentication, validation, publication, retrieval, and logout; they do not replace live integration testing. Update this section with verified Contentful, deployment, performance, and presentation results before submitting.
