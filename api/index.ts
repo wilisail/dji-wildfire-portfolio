@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { handleApi, type Environment } from '../server/api';
+import { handleApi, type Environment } from '../server/api.js';
 type VercelRequest = IncomingMessage & { body?: unknown; query?: Record<string, string | string[] | undefined> };
 export default async function handler(req: VercelRequest, res: ServerResponse) {
  const host = req.headers.host || 'localhost'; const proto = req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
