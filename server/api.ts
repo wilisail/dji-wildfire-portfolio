@@ -169,6 +169,7 @@ function configured(env: Environment) {
 
 export async function handleApi(request: Request, env: Environment): Promise<Response> {
  const url = new URL(request.url), path = url.pathname.replace(/^\/api/, '');
+ let authenticatedPublisher = false;
  try {
   if (request.method === 'POST') {
    const origin = request.headers.get('origin');
@@ -207,6 +208,7 @@ export async function handleApi(request: Request, env: Environment): Promise<Res
   if (path === '/posts' && request.method === 'POST') {
    const session = await readSession(request, env);
    if (!session) return json({ error: 'Sign in before publishing an article.' }, 401);
+   authenticatedPublisher = true;
    context(env, true);
    const input = await body(request), title = typeof input.title === 'string' ? input.title.trim() : '', content = typeof input.content === 'string' ? input.content.trim() : '', category = String(input.category || '');
    if (title.length < 5 || title.length > 120 || content.length < 40 || content.length > 20000 || !categories.includes(category)) return json({ error: 'Use a title of 5–120 characters, content of 40–20,000 characters, and a listed category.' }, 400);
@@ -233,6 +235,7 @@ export async function handleApi(request: Request, env: Environment): Promise<Res
   return json({ error: 'Endpoint not found.' }, 404);
  } catch (error) {
   const message = error instanceof Error ? error.message : 'The service is temporarily unavailable.';
+  if (authenticatedPublisher) return json({ error: message }, 502);
   if (path === '/auth/login' && !message.toLowerCase().includes('configured') && !message.includes('awaiting')) return json({ error: 'Sign-in failed. Check your editor credentials and try again.' }, 401);
   const needsSetup = message.toLowerCase().includes('configured') || message.includes('awaiting');
   return json({ error: needsSetup ? message : 'The content service is temporarily unavailable. Please try again.' }, needsSetup ? 503 : 502);
