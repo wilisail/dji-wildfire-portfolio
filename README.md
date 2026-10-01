@@ -13,7 +13,7 @@ Required pages: `/`, `/about`, `/solutions`, `/teams`, `/blog`, `/create-blog`, 
 ```bash
 npm ci
 cp .env.example .env.local
-# Set the Backendless URL and a random server session signing secret.
+# Set the Contentful API values and private editor/session credentials.
 npm run dev
 ```
 
