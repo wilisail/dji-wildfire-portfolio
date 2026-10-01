@@ -4,21 +4,25 @@ import { initialPosts } from '../src/data';
 
 const originalFetch = globalThis.fetch;
 type Entry = { sys: { id: string; version: number; updatedAt?: string }; fields: Record<string, unknown> };
-const published: Entry[] = initialPosts.map((post, i) => ({ sys: { id: `seed-${i}`, version: 2, updatedAt: post.publishedAt }, fields: { ...post, tags: post.tags } }));
+const featuredImage = { sys: { type: 'Link', linkType: 'Asset', id: 'sample-image' } };
+const richText = (text: string) => ({ nodeType: 'document', data: {}, content: [{ nodeType: 'paragraph', data: {}, content: [{ nodeType: 'text', value: text, marks: [], data: {} }] }] });
+const published: Entry[] = initialPosts.map((post, i) => ({ sys: { id: `seed-${i}`, version: 2, updatedAt: post.publishedAt }, fields: { internalName: post.title, slug: post.id, title: post.title, shortDescription: post.excerpt, content: richText(post.content), publishedDate: post.publishedAt.slice(0, 10), featuredImage } }));
 const drafts = new Map<string, Entry>();
 
 globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
  const url = new URL(String(input)), headers = new Headers(init?.headers), method = init?.method || 'GET';
  if (url.hostname === 'cdn.contentful.com') {
   assert.equal(headers.get('Authorization'), 'Bearer delivery-test-token');
-  const id = url.searchParams.get('fields.id');
-  const items = published.filter(post => !id || post.fields.id === id);
+  const id = url.searchParams.get('fields.slug');
+  const items = published.filter(post => !id || post.fields.slug === id);
   return Response.json({ items: url.searchParams.get('limit') === '1' ? items.slice(0, 1) : items });
  }
  if (url.hostname === 'api.contentful.com' && url.pathname.endsWith('/entries') && method === 'POST') {
   assert.equal(headers.get('Authorization'), 'Bearer management-test-token');
-  assert.equal(headers.get('X-Contentful-Content-Type'), 'blogPost');
+  assert.equal(headers.get('X-Contentful-Content-Type'), 'pageBlogPost');
   const fields = (JSON.parse(String(init?.body)) as { fields: Record<string, { 'en-US': unknown }> }).fields;
+  assert.ok(fields.slug && fields.internalName && fields.publishedDate && fields.featuredImage);
+  assert.equal((fields.content['en-US'] as { nodeType?: string }).nodeType, 'document');
   const entry: Entry = { sys: { id: 'created-entry', version: 1 }, fields: Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, value['en-US']])) };
   drafts.set(entry.sys.id, entry);
   return Response.json(entry, { status: 201 });
