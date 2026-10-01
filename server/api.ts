@@ -14,7 +14,8 @@ export interface Environment {
 
 interface Session { email: string; name: string; expires: number }
 interface ContentfulEntry { sys: { id: string; version?: number; updatedAt?: string }; fields: Record<string, unknown> }
-interface ContentfulResponse { items: ContentfulEntry[]; sys?: { id?: string; version?: number; updatedAt?: string }; fields?: Record<string, unknown> }
+interface ContentfulResponse { items: ContentfulEntry[]; includes?: { Asset?: ContentfulEntry[]; Entry?: ContentfulEntry[] }; sys?: { id?: string; version?: number; updatedAt?: string }; fields?: Record<string, unknown> }
+const contentType = 'pageBlogPost';
 
 const cookieName = 'wildfire_editor';
 const encoder = new TextEncoder();
@@ -82,21 +83,73 @@ async function contentful<T>(env: Environment, pathname: string, init: RequestIn
  return result;
 }
 
-function convert(entry: ContentfulEntry): Post {
- const fields = entry.fields || {};
- const tags = Array.isArray(fields.tags) ? fields.tags.filter((tag): tag is string => typeof tag === 'string') : [];
- const category = String(fields.category || categories[0]);
- return {
-  id: String(fields.id || entry.sys.id),
-  title: String(fields.title || ''),
-  excerpt: String(fields.excerpt || ''),
-  content: String(fields.content || ''),
-  category: categories.includes(category) ? category : categories[0],
-  tags,
-  author: String(fields.author || 'Editorial team'),
-  publishedAt: String(fields.publishedAt || entry.sys.updatedAt || new Date().toISOString()),
-  image: '/images/wildfire-900.webp',
+function richTextToMarkdown(value: unknown): string {
+ if (!value || typeof value !== 'object') return typeof value === 'string' ? value : '';
+ const visit = (node: unknown): string => {
+  if (!node || typeof node !== 'object') return '';
+  const item = node as { nodeType?: string; value?: string; marks?: Array<{ type?: string }>; content?: unknown[]; data?: { uri?: string } };
+  if (item.nodeType === 'text') {
+   let text = item.value || '';
+   for (const mark of item.marks || []) text = mark.type === 'bold' ? `**${text}**` : mark.type === 'italic' ? `*${text}*` : mark.type === 'code' ? `\`${text}\`` : text;
+   return text;
+  }
+  const children = (item.content || []).map(visit).join('');
+  switch (item.nodeType) {
+   case 'heading-1': return `# ${children}\n\n`;
+   case 'heading-2': return `## ${children}\n\n`;
+   case 'heading-3': return `### ${children}\n\n`;
+   case 'heading-4': return `#### ${children}\n\n`;
+   case 'heading-5': return `##### ${children}\n\n`;
+   case 'heading-6': return `###### ${children}\n\n`;
+   case 'paragraph': return `${children}\n\n`;
+   case 'blockquote': return children.split('\n').filter(Boolean).map(line => `> ${line}`).join('\n') + '\n\n';
+   case 'unordered-list': case 'ordered-list': return children + '\n';
+   case 'list-item': return `- ${children.trim()}\n`;
+   case 'hr': return '\n---\n\n';
+   case 'hyperlink': return `[${children}](${item.data?.uri || '#'})`;
+   default: return children;
+  }
  };
+ return visit(value).trim();
+}
+
+function linkedId(value: unknown): string | undefined {
+ if (!value || typeof value !== 'object') return undefined;
+ const sys = (value as { sys?: { id?: unknown } }).sys;
+ return typeof sys?.id === 'string' ? sys.id : undefined;
+}
+
+function convert(entry: ContentfulEntry, assets: ContentfulEntry[] = []): Post {
+ const fields = entry.fields || {};
+ const author = fields.author && typeof fields.author === 'object' ? (fields.author as { fields?: Record<string, unknown> }).fields : undefined;
+ const imageId = linkedId(fields.featuredImage);
+ const imageAsset = assets.find(asset => asset.sys.id === imageId);
+ const imageFields = imageAsset?.fields || {};
+ const file = imageFields.file && typeof imageFields.file === 'object' ? (imageFields.file as Record<string, unknown>) : {};
+ const imageUrl = typeof file.url === 'string' ? (file.url.startsWith('//') ? `https:${file.url}` : file.url) : '';
+ return {
+  id: String(fields.slug || entry.sys.id),
+  title: String(fields.title || ''),
+  excerpt: String(fields.shortDescription || ''),
+  content: richTextToMarkdown(fields.content),
+  category: categories[0],
+  tags: [],
+  author: String(author?.name || author?.fullName || author?.internalName || 'Editorial team'),
+  publishedAt: String(fields.publishedDate || entry.sys.updatedAt || new Date().toISOString()),
+  image: imageUrl || '/images/wildfire-900.webp',
+ };
+}
+
+function markdownToRichText(markdown: string) {
+ const blocks = markdown.split(/\n\s*\n/).map(part => part.trim()).filter(Boolean).map(block => {
+  const heading = block.match(/^(#{1,6})\s+(.+)$/);
+  const nodeType = heading ? `heading-${heading[1].length}` : block === '---' ? 'hr' : 'paragraph';
+  const text = heading ? heading[2] : block;
+  return nodeType === 'hr' ? { nodeType, data: {}, content: [] } : {
+   nodeType, data: {}, content: [{ nodeType: 'text', value: text.replace(/\[(.*?)\]\((https?:\/\/[^)]+)\)/g, '$1 ($2)'), marks: [], data: {} }],
+  };
+ });
+ return { nodeType: 'document', data: {}, content: blocks.length ? blocks : [{ nodeType: 'paragraph', data: {}, content: [{ nodeType: 'text', value: '', marks: [], data: {} }] }] };
 }
 
 async function sameSecret(a: string, b: string) {
@@ -140,16 +193,16 @@ export async function handleApi(request: Request, env: Environment): Promise<Res
   }
   if (path === '/auth/logout' && request.method === 'POST') return json({ success: true }, 200, { 'Set-Cookie': cookie('', request, true) });
   if (path === '/posts' && request.method === 'GET') {
-   const query = new URLSearchParams({ content_type: 'blogPost', limit: '100', order: '-fields.publishedAt' });
+   const query = new URLSearchParams({ content_type: contentType, limit: '100', order: '-fields.publishedDate', include: '1' });
    const result = await contentful<ContentfulResponse>(env, `/entries?${query}`);
-   return json({ posts: result.items.map(convert) });
+   return json({ posts: result.items.map(entry => convert(entry, result.includes?.Asset || [])) });
   }
   if (path.startsWith('/posts/') && request.method === 'GET') {
    const id = path.slice(7);
    if (!/^[a-z0-9-]{1,160}$/.test(id)) return json({ error: 'Article not found.' }, 404);
-   const query = new URLSearchParams({ content_type: 'blogPost', limit: '1', 'fields.id': id });
+   const query = new URLSearchParams({ content_type: contentType, limit: '1', 'fields.slug': id, include: '1' });
    const result = await contentful<ContentfulResponse>(env, `/entries?${query}`);
-   return result.items.length ? json({ post: convert(result.items[0]) }) : json({ error: 'Article not found.' }, 404);
+   return result.items.length ? json({ post: convert(result.items[0], result.includes?.Asset || []) }) : json({ error: 'Article not found.' }, 404);
   }
   if (path === '/posts' && request.method === 'POST') {
    const session = await readSession(request, env);
@@ -161,11 +214,15 @@ export async function handleApi(request: Request, env: Environment): Promise<Res
    const id = (title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || 'article') + '-' + crypto.randomUUID().slice(0, 8);
    const cms = context(env, true), locale = cms.locale, publishedAt = new Date().toISOString();
    const localized = (value: unknown) => ({ [locale]: value });
+   const seedQuery = new URLSearchParams({ content_type: contentType, limit: '1', select: 'fields.featuredImage' });
+   const seedEntries = await contentful<ContentfulResponse>(env, `/entries?${seedQuery}`);
+   const imageId = linkedId(seedEntries.items[0]?.fields?.featuredImage);
+   if (!imageId) throw new Error('Publish one sample blog post with a featured image in Contentful before publishing from the website.');
    const created = await contentful<ContentfulEntry>(env, `/entries`, {
     method: 'POST',
-    headers: { 'X-Contentful-Content-Type': 'blogPost' },
+    headers: { 'X-Contentful-Content-Type': contentType },
     body: JSON.stringify({ fields: {
-     id: localized(id), title: localized(title), excerpt: localized(content.replace(/[#*`>\n]/g, ' ').replace(/\s+/g, ' ').slice(0, 180)), content: localized(content), category: localized(category), tags: localized(tags), author: localized(session.name), publishedAt: localized(publishedAt),
+     internalName: localized(title + ' (' + id.slice(-8) + ')'), slug: localized(id), publishedDate: localized(publishedAt.slice(0, 10)), title: localized(title), shortDescription: localized(content.replace(/[#*`>\n]/g, ' ').replace(/\s+/g, ' ').slice(0, 180)), content: localized(markdownToRichText(content)), featuredImage: localized({ sys: { type: 'Link', linkType: 'Asset', id: imageId } }),
     } }),
    }, true);
    if (!created.sys?.id || !created.sys.version) throw new Error('Contentful created the article but returned no publish version.');
