@@ -17,12 +17,19 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const items = published.filter(post => !id || post.fields.slug === id);
   return Response.json({ items: url.searchParams.get('limit') === '1' ? items.slice(0, 1) : items });
  }
+ if (url.hostname === 'api.contentful.com' && url.pathname.endsWith('/locales') && method === 'GET') {
+  assert.equal(headers.get('Authorization'), 'Bearer management-test-token');
+  return Response.json({ items: [{ code: 'en-US', default: true, optional: false }, { code: 'de-DE', optional: false }, { code: 'fr-FR', optional: true }] });
+ }
  if (url.hostname === 'api.contentful.com' && url.pathname.endsWith('/entries') && method === 'POST') {
   assert.equal(headers.get('Authorization'), 'Bearer management-test-token');
   assert.equal(headers.get('X-Contentful-Content-Type'), 'pageBlogPost');
   const fields = (JSON.parse(String(init?.body)) as { fields: Record<string, { 'en-US': unknown }> }).fields;
   assert.ok(fields.slug && fields.internalName && fields.publishedDate && fields.featuredImage);
   assert.equal((fields.content['en-US'] as { nodeType?: string }).nodeType, 'document');
+  assert.equal((fields.title as Record<string, unknown>)['de-DE'], fields.title['en-US']);
+  assert.deepEqual((fields.content as Record<string, unknown>)['de-DE'], fields.content['en-US']);
+  assert.ok(!('fr-FR' in fields.title));
   const entry: Entry = { sys: { id: 'created-entry', version: 1 }, fields: Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, value['en-US']])) };
   drafts.set(entry.sys.id, entry);
   return Response.json(entry, { status: 201 });
