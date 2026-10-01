@@ -238,20 +238,28 @@ export async function handleApi(request: Request, env: Environment): Promise<Res
    const cms = context(env, true), locale = cms.locale, publishedAt = new Date().toISOString();
    const localized = (value: unknown) => ({ [locale]: value });
    const seedQuery = new URLSearchParams({ content_type: contentType, limit: '1', select: 'fields.featuredImage' });
-   const seedEntries = await contentful<ContentfulResponse>(env, `/entries?${seedQuery}`);
+   const [seedEntries, localeResult] = await Promise.all([
+    contentful<ContentfulResponse>(env, `/entries?${seedQuery}`),
+    contentful<{ items: Array<{ code: string; optional?: boolean; default?: boolean }> }>(env, '/locales', {}, true),
+   ]);
+   // This English-only portfolio uses the submitted text as editorial fallback
+   // for required template locales; it does not claim to translate the article.
+   const requiredLocales = [...new Set([locale, ...localeResult.items.filter(item => item.default || item.optional !== true).map(item => item.code)])];
+   const requiredText = (value: unknown) => Object.fromEntries(requiredLocales.map(code => [code, value]));
    const imageId = linkedId(seedEntries.items[0]?.fields?.featuredImage);
    if (!imageId) throw new Error('Publish one sample blog post with a featured image in Contentful before publishing from the website.');
    const created = await contentful<ContentfulEntry>(env, `/entries`, {
     method: 'POST',
     headers: { 'X-Contentful-Content-Type': contentType },
     body: JSON.stringify({ fields: {
-     internalName: localized(title + ' (' + id.slice(-8) + ')'), slug: localized(id), publishedDate: localized(publishedAt.slice(0, 10)), title: localized(title), shortDescription: localized(content.replace(/[#*`>\n]/g, ' ').replace(/\s+/g, ' ').slice(0, 180)), content: localized(markdownToRichText(content)), featuredImage: localized({ sys: { type: 'Link', linkType: 'Asset', id: imageId } }),
+     internalName: localized(title + ' (' + id.slice(-8) + ')'), slug: localized(id), publishedDate: localized(publishedAt.slice(0, 10)), title: requiredText(title), shortDescription: localized(content.replace(/[#*`>\n]/g, ' ').replace(/\s+/g, ' ').slice(0, 180)), content: requiredText(markdownToRichText(content)), featuredImage: localized({ sys: { type: 'Link', linkType: 'Asset', id: imageId } }),
     } }),
    }, true);
    if (!created.sys?.id || !created.sys.version) throw new Error('Contentful created the article but returned no publish version.');
    const entryId = encodeURIComponent(created.sys.id);
    const published = await contentful<ContentfulEntry>(env, `/entries/${entryId}/published`, { method: 'PUT', headers: { 'X-Contentful-Version': String(created.sys.version) } }, true);
-   return json({ post: convert(published) }, 201);
+   const publishedFields = Object.fromEntries(Object.entries(published.fields).map(([key, value]) => [key, value && typeof value === 'object' && locale in value ? (value as Record<string, unknown>)[locale] : value]));
+   return json({ post: { ...convert({ ...published, fields: publishedFields }), category, tags, author: session.name } }, 201);
   }
   return json({ error: 'Endpoint not found.' }, 404);
  } catch (error) {
