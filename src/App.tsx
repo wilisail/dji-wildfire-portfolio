@@ -6,8 +6,10 @@ type User = { name: string; email: string };
 const Auth = createContext<{ user: User | null; loading: boolean; refresh: () => Promise<void> }>({ user: null, loading: true, refresh: async () => {} });
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
  const res = await fetch('/api' + path, { credentials: 'same-origin', ...init, headers: { 'Content-Type': 'application/json', ...init?.headers } });
- const data = await res.json() as T & { error?: string };
+ let data: (T & { error?: string }) | undefined;
+ try { data = await res.json() as T & { error?: string }; } catch { throw new Error('The service is temporarily unavailable. Please try again.'); }
  if (!res.ok) throw new Error(data.error || 'Something went wrong. Please try again.');
+ if (!data) throw new Error('The service is temporarily unavailable. Please try again.');
  return data;
 }
 function AuthProvider({ children, enabled }: { children: ReactNode; enabled: boolean }) {
@@ -69,7 +71,7 @@ function PostCard({ post }: { post: Post }) { return <article className="post-ca
 function Blog() { const [posts, setPosts] = useState(initialPosts), [category, setCategory] = useState('All'), [error, setError] = useState('');
  useEffect(() => { api<{ posts: Post[] }>('/posts').then(data => setPosts(data.posts)).catch(e => setError(e.message)); }, []);
  const visible = category === 'All' ? posts : posts.filter(p => p.category === category);
- return <><PageHead eyebrow="The field journal" title="Insight for the next mission." description="Original notes on thermal imaging, equipment selection, and the connected aerial workflow." /><section className="container section section-topless"><h2 className="sr-only">Journal articles</h2><div className="blog-toolbar"><div className="filter-group" aria-label="Filter articles by category">{['All', ...categories].map(c => <button key={c} aria-pressed={category === c} onClick={() => setCategory(c)} className={category === c ? 'filter active' : 'filter'}>{c}</button>)}</div><a className="text-link" href="/create-blog">Write an article</a></div>{error && <p className="notice" role="status">Live articles are temporarily unavailable. Showing the original journal entries. {error}</p>}<p className="sr-only" aria-live="polite">{visible.length} articles shown</p><div className="grid gap-6 md:grid-cols-3">{visible.map(p => <PostCard post={p} key={p.id} />)}</div>{!visible.length && <p className="empty-state">There are no articles in this category yet.</p>}</section></>; }
+ return <><PageHead eyebrow="The field journal" title="Insight for the next mission." description="Original notes on thermal imaging, equipment selection, and the connected aerial workflow." /><section className="container section section-topless"><h2 className="sr-only">Journal articles</h2><div className="blog-toolbar"><div className="filter-group" aria-label="Filter articles by category">{['All', ...categories].map(c => <button key={c} aria-pressed={category === c} onClick={() => setCategory(c)} className={category === c ? 'filter active' : 'filter'}>{c}</button>)}</div><a className="text-link" href="/create-blog">Write an article</a></div>{error && <p className="notice" role="status">The live journal is temporarily unavailable. Showing the sample articles.</p>}<p className="sr-only" aria-live="polite">{visible.length} articles shown</p><div className="grid gap-6 md:grid-cols-3">{visible.map(p => <PostCard post={p} key={p.id} />)}</div>{!visible.length && <p className="empty-state">There are no articles in this category yet.</p>}</section></>; }
 function Article({ id }: { id: string }) { const [post, setPost] = useState<Post | undefined>(initialPosts.find(p => p.id === id)), [error, setError] = useState('');
  useEffect(() => { api<{ post: Post }>('/posts/' + encodeURIComponent(id)).then(d => setPost(d.post)).catch(e => setError(e.message)); }, [id]);
  useEffect(() => { if (post) { document.title = post.title + ' | DJI Enterprise Portfolio'; document.querySelector('meta[name="description"]')?.setAttribute('content', post.excerpt); } }, [post]);
