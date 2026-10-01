@@ -1,4 +1,4 @@
-import { categories, type Post } from '../src/data';
+import { categories, type Post } from '../src/data.js';
 
 export interface Environment {
  CONTENTFUL_SPACE_ID?: string;
