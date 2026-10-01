@@ -1,0 +1,32 @@
+[
+  {
+    "id": "thermal-imaging-in-wildfire-response",
+    "title": "What thermal imaging adds to wildfire response",
+    "excerpt": "How visual and infrared views give incident teams complementary information about the same landscape.",
+    "category": "Technology",
+    "tags": "[\"thermal imaging\",\"wildfires\"]",
+    "author": "Portfolio editorial team",
+    "publishedAt": "2026-09-30T08:00:00Z",
+    "content": "# Two views of the same incident\n\nA visual camera records the scene as people normally see it. A thermal camera records differences in infrared radiation. Used together, these views help a trained operator locate areas that need closer attention.\n\n## From image to decision\n\nDuring a wildfire mission, the operator can switch between visual and thermal views, inspect potential hotspots, and share their locations with the incident team. The usefulness of a temperature reading depends on equipment settings and environmental conditions.\n\n- Select the appropriate thermal palette and gain mode.\n- Compare a thermal observation with the visual scene.\n- Share a location and context with the ground team.\n- Record observations for the post-incident review.\n\n## People remain part of the workflow\n\nThermal imagery is one input to a response decision. Mission planning, airspace coordination, equipment selection, and an experienced incident commander remain essential.\n\nThis original portfolio article summarizes the workflow on [DJI’s wildfire solutions page](https://enterprise.dji.com/public-safety/wildfires)."
+  },
+  {
+    "id": "choosing-a-wildfire-drone-platform",
+    "title": "Choosing a platform around the mission",
+    "excerpt": "Portability, payloads, and endurance are different tradeoffs. Start with the operational task.",
+    "category": "Mission planning",
+    "tags": "[\"equipment\",\"planning\"]",
+    "author": "Portfolio editorial team",
+    "publishedAt": "2026-09-29T08:00:00Z",
+    "content": "# Begin with the mission\n\nChoosing an aerial platform is a practical tradeoff between portability, endurance, and the sensors the task requires. A first-response vehicle and an established incident command team may need different equipment.\n\n## Portable reconnaissance\n\nThe Matrice 4T combines visual and thermal cameras in a compact platform. DJI presents it as an option for rapid deployment and initial assessment.\n\n## Payload flexibility\n\nThe Matrice 400 supports different payloads. DJI pairs it with the Zenmuse H30T in its high-performance wildfire response solution.\n\n## A balanced field platform\n\nThe Matrice 30T combines visual, thermal, and laser rangefinding capabilities. It is another option when an integrated field platform fits the mission.\n\nPublished maximum flight times describe manufacturer test conditions. Teams must plan around their actual payload, weather, battery reserve, and operational constraints. See the [official solution reference](https://enterprise.dji.com/public-safety/wildfires) for specifications."
+  },
+  {
+    "id": "from-reconnaissance-to-incident-review",
+    "title": "From reconnaissance to incident review",
+    "excerpt": "A useful mission delivers more than an image: it gives teams shared context and a record they can review.",
+    "category": "Field operations",
+    "tags": "[\"workflow\",\"documentation\"]",
+    "author": "Portfolio editorial team",
+    "publishedAt": "2026-09-28T08:00:00Z",
+    "content": "# A shared picture of the incident\n\nAn aerial mission can help teams understand a changing fire area. Its value depends on how observations reach the people making decisions.\n\n## Observe\n\nA pilot surveys the affected area and examines visual and thermal imagery. The mission remains coordinated with the wider incident response.\n\n## Locate and communicate\n\nAn operator can record hotspot coordinates and share them with ground teams. Mission-management software helps organize imagery and location information.\n\n## Document\n\nImages and mapping results can support post-incident analysis and recovery planning. A consistent record helps teams explain what was observed and when.\n\nThe [DJI wildfire reference](https://enterprise.dji.com/public-safety/wildfires) describes reconnaissance, information sharing, and post-mission documentation as connected stages."
+  }
+]
