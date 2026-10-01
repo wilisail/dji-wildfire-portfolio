@@ -176,7 +176,24 @@ export async function handleApi(request: Request, env: Environment): Promise<Res
    if (origin && origin !== url.origin) return json({ error: 'This publishing request must come from this website.' }, 403);
    if (!request.headers.get('content-type')?.includes('application/json')) return json({ error: 'A JSON request is required.' }, 415);
   }
-  if (path === '/health' && request.method === 'GET') return json({ status: 'ok', backendConfigured: configured(env), authConfigured: Boolean(env.EDITOR_EMAIL && env.EDITOR_PASSWORD && env.SESSION_SECRET && env.SESSION_SECRET.length >= 32) });
+  if (path === '/health' && request.method === 'GET') {
+   const health: Record<string, unknown> = { status: 'ok', backendConfigured: configured(env), authConfigured: Boolean(env.EDITOR_EMAIL && env.EDITOR_PASSWORD && env.SESSION_SECRET && env.SESSION_SECRET.length >= 32) };
+   if (url.searchParams.get('check') === 'publishing') {
+    // Validate the deployed credential with a read-only request. Return only
+    // service status, never credentials, account details, or CMS content.
+    try {
+     const cms = context(env, true);
+     const response = await fetch(cms.url + '/content_types/' + contentType, {
+      headers: { Authorization: `Bearer ${cms.token}` }, signal: AbortSignal.timeout(12000),
+     });
+     health.publishingCheck = { reachable: true, credentialAccepted: response.ok, upstreamStatus: response.status };
+     await response.body?.cancel();
+    } catch {
+     health.publishingCheck = { reachable: false, credentialAccepted: false };
+    }
+   }
+   return json(health);
+  }
   if (path === '/auth/session' && request.method === 'GET') {
    const session = await readSession(request, env);
    return json({ user: session ? { email: session.email, name: session.name } : null });
