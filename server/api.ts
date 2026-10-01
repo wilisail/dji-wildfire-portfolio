@@ -76,9 +76,13 @@ async function contentful<T>(env: Environment, pathname: string, init: RequestIn
  if (write) headers.set('Content-Type', 'application/vnd.contentful.management.v1+json');
  const response = await fetch(cms.url + pathname, { ...init, headers, signal: AbortSignal.timeout(12000) });
  const raw = await response.text();
- let result: (T & { message?: string }) | undefined;
- try { result = raw ? JSON.parse(raw) as T & { message?: string } : undefined; } catch { result = undefined; }
- if (!response.ok) throw new Error(result?.message || `Contentful request failed (${response.status}).`);
+ type CmsError = { message?: string; details?: { errors?: Array<{ name?: string; path?: Array<string | number>; details?: string }> } };
+ let result: (T & CmsError) | undefined;
+ try { result = raw ? JSON.parse(raw) as T & CmsError : undefined; } catch { result = undefined; }
+ if (!response.ok) {
+  const fields = result?.details?.errors?.map(error => `${error.path?.join('.') || error.name || 'Article'}: ${error.details || error.name || 'invalid value'}`).join('; ');
+  throw new Error((result?.message || `Contentful request failed (${response.status}).`) + (fields ? ` — ${fields}` : ''));
+ }
  if (result === undefined) throw new Error('Contentful returned an empty response.');
  return result;
 }
